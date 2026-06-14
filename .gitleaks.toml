@@ -1,0 +1,35 @@
+# gitleaks config для публичных репозиториев clipia-ai.
+# Расширяет дефолтные правила gitleaks + добавляет Clipia-специфику.
+# Используется: (1) CI (gitleaks-action) на каждый push/PR, (2) локально
+# scripts/public-repo-guard.sh перед публикацией.
+
+title = "Clipia public repo gitleaks config"
+
+[extend]
+useDefault = true   # все встроенные правила gitleaks (AWS, GCP, Stripe, JWT, private keys, ...)
+
+# ── Кастомные правила под Clipia ──────────────────────────────────────────────
+[[rules]]
+id = "clipia-api-key"
+description = "Clipia API key (live/test)"
+regex = '''clipia_(live|test)_[A-Za-z0-9]{16,}'''
+keywords = ["clipia_live_", "clipia_test_"]
+
+# NB: детект имён upstream-провайдеров (rule #1) намеренно ВЫНЕСЕН в приватный
+# scripts/public-repo-guard.sh — список имён сам по себе коммерческая тайна и НЕ
+# должен попадать в публичный конфиг. Guard прогоняется до пуша в публичный репо.
+
+# ── Allowlist: заведомо-фейковые тест-фикстуры и плейсхолдеры ──────────────────
+[allowlist]
+description = "Test fixtures, placeholders, docs — не настоящие секреты"
+regexes = [
+  '''clipia_(live|test)_(test|TEST|fake|FAKE|dummy|DUMMY|example|EXAMPLE|placeholder|testkey|test_key|YOUR_KEY|XXXX)''',
+  '''whsec_test_secret''',
+  '''YOUR_API_KEY|YOUR_KEY|<your-?api-?key>|clipia_live_XXXX|clipia_live_YOUR''',
+]
+paths = [
+  '''(.*?)(test|tests|__tests__|spec|examples?|fixtures?)(/|\.).*''',
+  '''.*\.(md|mdx)$''',
+]
+# false-positive: слова, где провайдер-regex может зацепить англ. слова
+stopwords = ["cookie", "takie", "rookie", "bookie"]
