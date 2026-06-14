@@ -113,7 +113,7 @@ function hexToBytes(hex: string): Buffer | null {
  *
  * @example
  * ```ts
- * import { verifyWebhookSignature } from '@clipia/client/webhook';
+ * import { verifyWebhookSignature } from 'clipia/webhook';
  *
  * app.post('/clipia/webhook', (req, res) => {
  *   const ok = verifyWebhookSignature({

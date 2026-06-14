@@ -1,5 +1,5 @@
 /**
- * @clipia/client — official TypeScript client for the Clipia public API.
+ * clipia — official TypeScript client for the Clipia public API.
  *
  * Zero runtime dependencies; built on the global `fetch`. Mirrors the fal.ai
  * queue DX (`submit → status → result` + `subscribe`) but with Clipia-native
@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { createClient } from '@clipia/client';
+ * import { createClient } from 'clipia';
  *
  * const clipia = createClient({ apiKey: process.env.CLIPIA_KEY! });
  * const out = await clipia.subscribe('nano-banana-2', {

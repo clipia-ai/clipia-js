@@ -1,4 +1,4 @@
-# @clipia/client
+# clipia
 
 Official TypeScript client and `clipia` CLI for the [Clipia](https://api.clipia.ai)
 public API — a queue-based API for AI image and video generation.
@@ -19,8 +19,8 @@ billing.
 ## Installation
 
 ```bash
-npm install @clipia/client
-# or: pnpm add @clipia/client / yarn add @clipia/client
+npm install clipia
+# or: pnpm add clipia / yarn add clipia
 ```
 
 Requires Node.js 18+ (for the global `fetch`). For older runtimes, pass a
@@ -33,7 +33,7 @@ shown once. It is sent as `Authorization: Bearer <apiKey>` and is a
 **server-side secret** — never ship it in a browser or mobile app.
 
 ```ts
-import { createClient } from '@clipia/client';
+import { createClient } from 'clipia';
 
 const clipia = createClient({
   apiKey: process.env.CLIPIA_KEY!,
@@ -130,8 +130,8 @@ server when the generation finishes. Verify every delivery with the bundled
 helper before trusting it.
 
 ```ts
-import { verifyWebhookSignature } from '@clipia/client';
-// or: import { verifyWebhookSignature } from '@clipia/client/webhook';
+import { verifyWebhookSignature } from 'clipia';
+// or: import { verifyWebhookSignature } from 'clipia/webhook';
 
 // Express example — make sure you have the RAW request body.
 app.post('/clipia/webhook', express.raw({ type: 'application/json' }), (req, res) => {
@@ -160,7 +160,7 @@ pass and never throws on malformed input.
 Every non-2xx response throws a typed `ClipiaApiError`:
 
 ```ts
-import { ClipiaApiError } from '@clipia/client';
+import { ClipiaApiError } from 'clipia';
 
 try {
   await clipia.queue.submit('nano-banana-2', { input: { prompt: '...' } });
@@ -228,7 +228,7 @@ import {
   ClipiaApiError,
   verifyWebhookSignature,
   VERSION,
-} from '@clipia/client';
+} from 'clipia';
 
 const clipia = createClient({ apiKey, baseUrl?, fetch? });
 
