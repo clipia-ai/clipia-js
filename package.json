@@ -1,0 +1,80 @@
+{
+  "name": "@clipia/client",
+  "version": "1.0.0",
+  "description": "Official TypeScript client and CLI for the Clipia public API (image & video generation queue).",
+  "license": "MIT",
+  "author": "Clipia <support@clipia.ai> (https://clipia.ai)",
+  "homepage": "https://clipia.ai/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clipia-ai/clipia-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/clipia-ai/clipia-js/issues"
+  },
+  "keywords": [
+    "clipia",
+    "ai",
+    "image-generation",
+    "video-generation",
+    "text-to-image",
+    "text-to-video",
+    "image-to-video",
+    "generative-ai",
+    "sdk",
+    "client",
+    "cli",
+    "mcp"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./webhook": {
+      "types": "./dist/webhook.d.ts",
+      "import": "./dist/webhook.js",
+      "require": "./dist/webhook.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "clipia": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.6"
+  },
+  "overrides": {
+    "esbuild": ">=0.28.1"
+  }
+}

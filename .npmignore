@@ -1,0 +1,15 @@
+# The published tarball is controlled by the "files" allowlist in package.json
+# (dist + README + LICENSE). This .npmignore is a belt-and-suspenders guard so
+# that source, tests and config never leak into the package even if "files"
+# is loosened.
+
+src
+test
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.npmignore
+*.tsbuildinfo
+node_modules
+coverage
+.DS_Store
