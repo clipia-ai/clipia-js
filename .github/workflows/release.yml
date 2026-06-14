@@ -1,0 +1,45 @@
+name: Release to npm
+
+# Trusted Publishing (OIDC) — без долгоживущего токена + provenance-аттестация.
+# Provenance ссылается на ЭТОТ публичный репо (clipia-ai/clipia-js), а не на
+# приватный монорепо — поэтому аттестация верифицируема и не светит внутреннюю
+# инфраструктуру (правило #1). Настраивается на npmjs.com как trusted publisher:
+# пакет clipia-ai → Settings → Trusted Publisher → GitHub, org=clipia-ai,
+# repo=clipia-js, workflow=release.yml.
+#
+# ИСТОЧНИК ПРАВДЫ — приватный монорепо sdk/typescript/.github/workflows/release.yml;
+# сюда (clipia-ai/clipia-js) попадает зеркалированием. Не редактировать напрямую.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build & publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC trusted publishing + provenance
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # npm trusted publishing требует Node 22.14+
+          registry-url: 'https://registry.npmjs.org'
+      - name: Upgrade npm to 11.5.1+ (требование trusted publishing)
+        run: npm install -g npm@latest
+      - name: Install + verify
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Publish (OIDC trusted publishing, provenance авто)
+        # Без NODE_AUTH_TOKEN: npm 11.5.1+ при id-token:write сам берёт
+        # короткоживущий OIDC-токен и прикладывает provenance.
+        run: npm publish --access public
