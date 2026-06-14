@@ -39,7 +39,11 @@ jobs:
           npm run typecheck
           npm test
           npm run build
-      - name: Publish (OIDC trusted publishing, provenance авто)
-        # Без NODE_AUTH_TOKEN: npm 11.5.1+ при id-token:write сам берёт
-        # короткоживущий OIDC-токен и прикладывает provenance.
+      - name: Publish (OIDC trusted publishing, иначе NPM_TOKEN)
+        # npm 11.5.1+ при настроенном trusted publisher берёт короткоживущий
+        # OIDC-токен + provenance (предпочтительно). Если trusted publisher не
+        # настроен, но в secrets репо есть NPM_TOKEN — публикует им (fallback,
+        # без provenance). Настроить одно из двух — см. docs SDK_RELEASE.md.
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
