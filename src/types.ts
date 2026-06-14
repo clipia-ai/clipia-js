@@ -5,15 +5,22 @@
  * wire format (snake_case fields) returned by `https://api.clipia.ai/v1/*`.
  */
 
-/** Lifecycle status of a generation request. */
+/**
+ * Lifecycle status of a generation request.
+ *
+ * `CANCELED` is terminal: a generation can be canceled out-of-band (e.g. from
+ * the Clipia web UI) — the public API has no cancel endpoint, but `status` may
+ * still report `CANCELED`, so clients must treat it as a terminal outcome.
+ */
 export type GenerationStatus =
   | 'IN_QUEUE'
   | 'IN_PROGRESS'
   | 'COMPLETED'
-  | 'FAILED';
+  | 'FAILED'
+  | 'CANCELED';
 
 /** Terminal statuses — no further polling required once reached. */
-export const TERMINAL_STATUSES = ['COMPLETED', 'FAILED'] as const;
+export const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELED'] as const;
 export type TerminalStatus = (typeof TERMINAL_STATUSES)[number];
 
 /** Arbitrary, model-specific generation input (see `GET /v1/models/{slug}`). */

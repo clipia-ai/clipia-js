@@ -246,6 +246,18 @@ describe('subscribe', () => {
     expect(out.error?.code).toBe('GENERATION_FAILED');
   });
 
+  it('stops polling on terminal CANCELED (regression: subscribe must not hang)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, { request_id: 'req-c', status: 'IN_QUEUE', status_url: '', response_url: '' }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { request_id: 'req-c', status: 'CANCELED' }))
+      .mockResolvedValueOnce(jsonResponse(200, { request_id: 'req-c', status: 'CANCELED' }));
+
+    const out = await client.subscribe('m', { input: { prompt: 'x' }, pollIntervalMs: 1, timeoutMs: 500 });
+    expect(out.status).toBe('CANCELED');
+  });
+
   it('throws a subscribe_timeout ClipiaApiError when the deadline passes', async () => {
     fetchMock
       .mockResolvedValueOnce(
