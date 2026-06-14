@@ -1,5 +1,5 @@
 {
-  "name": "clipia",
+  "name": "clipia-ai",
   "version": "1.0.0",
   "description": "Official TypeScript client and CLI for the Clipia public API (image & video generation queue).",
   "license": "MIT",

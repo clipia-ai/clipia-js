@@ -19,8 +19,8 @@ billing.
 ## Installation
 
 ```bash
-npm install clipia
-# or: pnpm add clipia / yarn add clipia
+npm install clipia-ai
+# or: pnpm add clipia-ai / yarn add clipia-ai
 ```
 
 Requires Node.js 18+ (for the global `fetch`). For older runtimes, pass a
@@ -33,7 +33,7 @@ shown once. It is sent as `Authorization: Bearer <apiKey>` and is a
 **server-side secret** — never ship it in a browser or mobile app.
 
 ```ts
-import { createClient } from 'clipia';
+import { createClient } from 'clipia-ai';
 
 const clipia = createClient({
   apiKey: process.env.CLIPIA_KEY!,
@@ -130,8 +130,8 @@ server when the generation finishes. Verify every delivery with the bundled
 helper before trusting it.
 
 ```ts
-import { verifyWebhookSignature } from 'clipia';
-// or: import { verifyWebhookSignature } from 'clipia/webhook';
+import { verifyWebhookSignature } from 'clipia-ai';
+// or: import { verifyWebhookSignature } from 'clipia-ai/webhook';
 
 // Express example — make sure you have the RAW request body.
 app.post('/clipia/webhook', express.raw({ type: 'application/json' }), (req, res) => {
@@ -160,7 +160,7 @@ pass and never throws on malformed input.
 Every non-2xx response throws a typed `ClipiaApiError`:
 
 ```ts
-import { ClipiaApiError } from 'clipia';
+import { ClipiaApiError } from 'clipia-ai';
 
 try {
   await clipia.queue.submit('nano-banana-2', { input: { prompt: '...' } });
@@ -228,7 +228,7 @@ import {
   ClipiaApiError,
   verifyWebhookSignature,
   VERSION,
-} from 'clipia';
+} from 'clipia-ai';
 
 const clipia = createClient({ apiKey, baseUrl?, fetch? });
 
