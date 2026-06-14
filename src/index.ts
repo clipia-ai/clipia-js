@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { createClient } from 'clipia';
+ * import { createClient } from 'clipia-ai';
  *
  * const clipia = createClient({ apiKey: process.env.CLIPIA_KEY! });
  * const out = await clipia.subscribe('nano-banana-2', {
