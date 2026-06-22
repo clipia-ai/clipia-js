@@ -247,7 +247,7 @@ clipia.account.get(signal?);
 Clipia hosts a remote **Model Context Protocol** server, so an AI coding agent
 can generate images/video, poll results, list models, search prompt templates
 and read your balance directly — **no SDK or code required**. The server is
-stateless Streamable HTTP at `https://api.clipia.ai/mcp` and authenticates with
+stateless Streamable HTTP at `https://mcp.clipia.ai/mcp` and authenticates with
 the same API key (as a Bearer token).
 
 Tools exposed: `generate_image`, `generate_video`, `wait_generation`,
@@ -256,7 +256,7 @@ Tools exposed: `generate_image`, `generate_video`, `wait_generation`,
 ### Claude Code
 
 ```bash
-claude mcp add --transport http clipia https://api.clipia.ai/mcp \
+claude mcp add --transport http clipia https://mcp.clipia.ai/mcp \
   --header "Authorization: Bearer clipia_live_xxxxxxxx"
 ```
 
@@ -268,7 +268,7 @@ Add to `~/.cursor/mcp.json` (or the project's `.cursor/mcp.json`):
 {
   "mcpServers": {
     "clipia": {
-      "url": "https://api.clipia.ai/mcp",
+      "url": "https://mcp.clipia.ai/mcp",
       "headers": {
         "Authorization": "Bearer clipia_live_xxxxxxxx"
       }
