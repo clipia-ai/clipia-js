@@ -51,6 +51,37 @@ describe('createClient', () => {
     await c.models.list();
     expect(callArgs().url).toBe('https://x.test/v1/models');
   });
+
+  it('accepts an https baseUrl', () => {
+    expect(() =>
+      createClient({ apiKey: API_KEY, baseUrl: 'https://api.example.com' }),
+    ).not.toThrow();
+  });
+
+  it('allows http://localhost for local development', async () => {
+    const c = createClient({ apiKey: API_KEY, baseUrl: 'http://localhost:3000' });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: [] }));
+    await c.models.list();
+    expect(callArgs().url).toBe('http://localhost:3000/v1/models');
+  });
+
+  it('allows http://127.0.0.1 for local development', () => {
+    expect(() =>
+      createClient({ apiKey: API_KEY, baseUrl: 'http://127.0.0.1:8080' }),
+    ).not.toThrow();
+  });
+
+  it('throws on a plain http baseUrl (key would leak in cleartext)', () => {
+    expect(() =>
+      createClient({ apiKey: API_KEY, baseUrl: 'http://api.example.com' }),
+    ).toThrow(/https/);
+  });
+
+  it('rejects a localhost-lookalike host over http', () => {
+    expect(() =>
+      createClient({ apiKey: API_KEY, baseUrl: 'http://localhost.evil.com' }),
+    ).toThrow(/https/);
+  });
 });
 
 describe('queue.submit', () => {
@@ -256,6 +287,71 @@ describe('subscribe', () => {
 
     const out = await client.subscribe('m', { input: { prompt: 'x' }, pollIntervalMs: 1, timeoutMs: 500 });
     expect(out.status).toBe('CANCELED');
+  });
+
+  it('retries a transient 503 during polling instead of failing the whole op', async () => {
+    fetchMock
+      // submit
+      .mockResolvedValueOnce(
+        jsonResponse(200, { request_id: 'req-r', status: 'IN_QUEUE', status_url: '', response_url: '' }),
+      )
+      // status poll 1 -> transient 503 (should be retried, not surfaced)
+      .mockResolvedValueOnce(
+        jsonResponse(503, { error: { type: 'api_error', code: 'service_unavailable', message: 'try later' } }),
+      )
+      // status poll 2 -> terminal
+      .mockResolvedValueOnce(jsonResponse(200, { request_id: 'req-r', status: 'COMPLETED' }))
+      // result
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          request_id: 'req-r',
+          status: 'COMPLETED',
+          output: { images: [{ url: 'https://media.clipia.ai/r.png' }] },
+        }),
+      );
+
+    const out = await client.subscribe('m', { input: { prompt: 'x' }, pollIntervalMs: 1 });
+    expect(out.status).toBe('COMPLETED');
+    expect(out.output?.images?.[0]?.url).toBe('https://media.clipia.ai/r.png');
+    // submit + (503 + COMPLETED) status + result = 4 calls; the 503 did not abort.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('gives up after exhausting poll retries on persistent transient errors', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, { request_id: 'req-e', status: 'IN_QUEUE', status_url: '', response_url: '' }),
+      )
+      // every status poll fails transiently; fresh Response per call.
+      .mockImplementation(async () =>
+        jsonResponse(500, { error: { type: 'api_error', code: 'internal_error', message: 'boom' } }),
+      );
+
+    const err = await client
+      .subscribe('m', { input: { prompt: 'x' }, pollIntervalMs: 1, timeoutMs: 60_000 })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(ClipiaApiError);
+    expect(err.status).toBe(500);
+    // submit + (MAX_POLL_RETRIES=4 retries + 1 final throw) = 1 + 5 = 6 calls.
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it('does not retry a non-transient error (e.g. 404) during polling', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, { request_id: 'req-n', status: 'IN_QUEUE', status_url: '', response_url: '' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(404, { error: { type: 'invalid_request_error', code: 'not_found', message: 'gone' } }),
+      );
+
+    const err = await client
+      .subscribe('m', { input: { prompt: 'x' }, pollIntervalMs: 1 })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(ClipiaApiError);
+    expect(err.status).toBe(404);
+    // submit + single failing status (no retry) = 2 calls.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('throws a subscribe_timeout ClipiaApiError when the deadline passes', async () => {

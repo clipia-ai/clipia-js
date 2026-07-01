@@ -66,21 +66,56 @@ export class ClipiaApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly type: string;
+  /**
+   * Parsed `Retry-After` delay in milliseconds, when the server sent one
+   * (typically on `429`/`503`). Used by `subscribe` to pace transient retries.
+   */
+  readonly retryAfterMs?: number;
 
   constructor(params: {
     status: number;
     code: string;
     type: string;
     message: string;
+    retryAfterMs?: number;
   }) {
     super(params.message);
     this.name = 'ClipiaApiError';
     this.status = params.status;
     this.code = params.code;
     this.type = params.type;
+    this.retryAfterMs = params.retryAfterMs;
     // Restore prototype chain for instanceof across transpile targets.
     Object.setPrototypeOf(this, ClipiaApiError.prototype);
   }
+}
+
+/** HTTP statuses worth retrying during polling (transient server/throttle). */
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
+/** Max consecutive transient failures tolerated per poll before giving up. */
+const MAX_POLL_RETRIES = 4;
+
+/** Parse an HTTP `Retry-After` header (delta-seconds or HTTP-date) to ms. */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return seconds >= 0 ? seconds * 1000 : undefined;
+  }
+  const date = Date.parse(value);
+  if (!Number.isNaN(date)) {
+    const delta = date - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+  return undefined;
+}
+
+/** Whether an error raised during polling is a transient, retryable one. */
+function isRetryablePollError(err: unknown): err is ClipiaApiError {
+  return (
+    err instanceof ClipiaApiError &&
+    (err.code === 'network_error' || TRANSIENT_STATUSES.has(err.status))
+  );
 }
 
 /** Generate a RFC-4122 v4 UUID without runtime dependencies. */
@@ -165,6 +200,23 @@ export function createClient(config: ClientConfig): ClipiaClient {
   }
 
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+  // Reject non-HTTPS base URLs so the API key (sent as a Bearer token) never
+  // travels in cleartext on misconfiguration. http://localhost and
+  // http://127.0.0.1 are allowed for local development. The host must be
+  // *exactly* localhost / 127.0.0.1 (optionally with a port/path) — a
+  // lookalike like http://localhost.evil.com must NOT pass.
+  const lowerBaseUrl = baseUrl.toLowerCase();
+  const isHttps = lowerBaseUrl.startsWith('https://');
+  const isLocalHttp = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(
+    lowerBaseUrl,
+  );
+  if (!isHttps && !isLocalHttp) {
+    throw new Error(
+      'createClient: `baseUrl` must use https:// (the API key is sent as a ' +
+        'Bearer token and would leak in cleartext over http). Only ' +
+        'http://localhost and http://127.0.0.1 are allowed for local development.',
+    );
+  }
   const fetchImpl = config.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') {
     throw new TypeError(
@@ -239,6 +291,7 @@ export function createClient(config: ClientConfig): ClipiaClient {
       code: e?.code ?? 'unknown_error',
       type: e?.type ?? 'api_error',
       message: e?.message ?? `Request failed with HTTP ${response.status}`,
+      retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
     });
   }
 
@@ -310,6 +363,12 @@ export function createClient(config: ClientConfig): ClipiaClient {
       queue_position: submitted.queue_position ?? null,
     });
 
+    // Number of consecutive transient failures seen so far while polling. A
+    // single 5xx/429/network blip on an in-flight request must NOT lose the
+    // request_id — retry a bounded number of times (capped backoff, honoring
+    // Retry-After) before surfacing the error.
+    let transientFailures = 0;
+
     for (;;) {
       if (Date.now() >= deadline) {
         throw new ClipiaApiError({
@@ -320,7 +379,26 @@ export function createClient(config: ClientConfig): ClipiaClient {
         });
       }
 
-      const status = await queue.status(requestId, signal);
+      let status: StatusResponse;
+      try {
+        status = await queue.status(requestId, signal);
+        transientFailures = 0;
+      } catch (err) {
+        if (!isRetryablePollError(err) || transientFailures >= MAX_POLL_RETRIES) {
+          throw err;
+        }
+        transientFailures += 1;
+        // Capped exponential backoff (base = pollInterval), unless the server
+        // told us exactly how long to wait via Retry-After.
+        const backoff = Math.min(
+          pollIntervalMs * 2 ** transientFailures,
+          30_000,
+        );
+        const waitMs = err.retryAfterMs ?? backoff;
+        await sleep(waitMs, signal);
+        continue;
+      }
+
       options.onQueueUpdate?.(status);
 
       if ((TERMINAL_STATUSES as readonly string[]).includes(status.status)) {

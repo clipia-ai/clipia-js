@@ -79,7 +79,10 @@ export interface StatusResponse {
 
 /** A single produced image. */
 export interface OutputImage {
+  /** Optimized delivery URL (typically WebP) — best for display. */
   url: string;
+  /** Full-quality original (PNG/JPG) when available — use for downloads. */
+  original_url?: string;
   width?: number;
   height?: number;
 }
@@ -87,6 +90,8 @@ export interface OutputImage {
 /** A produced video. */
 export interface OutputVideo {
   url: string;
+  /** Full-quality original when available. */
+  original_url?: string;
   width?: number;
   height?: number;
   duration?: number;
