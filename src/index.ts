@@ -20,10 +20,10 @@
 
 import type {
   Account,
+  AnyModelDetail,
   ApiErrorEnvelope,
   EstimateResponse,
   GenerationInput,
-  ModelDetail,
   ModelList,
   ResultResponse,
   StatusResponse,
@@ -45,7 +45,7 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 600_000;
 
 /** SDK version — keep in sync with package.json. */
-export const VERSION = '1.0.1';
+export const VERSION = '1.1.0';
 const USER_AGENT = `clipia-sdk-js/${VERSION}`;
 
 /** Configuration for {@link createClient}. */
@@ -176,7 +176,7 @@ export interface ClipiaClient {
   subscribe(model: string, options: SubscribeOptions): Promise<ResultResponse>;
   models: {
     list(signal?: AbortSignal): Promise<ModelList>;
-    get(slug: string, signal?: AbortSignal): Promise<ModelDetail>;
+    get(slug: string, signal?: AbortSignal): Promise<AnyModelDetail>;
     /** Estimate the deterministic credit cost of an `input` for a model. */
     estimate(
       slug: string,
@@ -418,7 +418,7 @@ export function createClient(config: ClientConfig): ClipiaClient {
       return data;
     },
     async get(slug, signal) {
-      const { data } = await request<ModelDetail>(
+      const { data } = await request<AnyModelDetail>(
         `/v1/models/${encodeURIComponent(slug)}`,
         { method: 'GET', signal },
       );

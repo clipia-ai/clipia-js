@@ -93,7 +93,7 @@ if (result.pending) {
 ### Models, cost estimate and account
 
 ```ts
-const { data } = await clipia.models.list();
+const { data } = await clipia.models.list(); // text + image/video/audio
 const model = await clipia.models.get('seedance-2-fast-t2v');
 
 // Deterministic credit cost for a given input, before you submit.
@@ -107,6 +107,11 @@ console.log(`this will cost ${credits} credits`);
 const account = await clipia.account.get();
 console.log(account.balance.credits);
 ```
+
+The unified catalog also returns OpenAI/OpenRouter-shaped text models such as
+`gpt-5.6-sol`; their entries use `id`, `context_length` and per-token
+`pricing`. Use the standard OpenAI SDK with
+`baseURL: 'https://api.clipia.ai/v1'` for chat completions.
 
 ### Video generation
 

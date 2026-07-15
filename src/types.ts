@@ -140,6 +140,11 @@ export interface ModelPricing {
 
 /** A model entry in `GET /v1/models`. */
 export interface ModelSummary {
+  /** OpenAI-compatible id; present when the unified LLM catalog is enabled. */
+  id?: string;
+  object?: 'model';
+  created?: number;
+  owned_by?: string;
   slug: string;
   type: 'image' | 'video' | string;
   name: string;
@@ -148,9 +153,37 @@ export interface ModelSummary {
   pricing?: ModelPricing;
 }
 
+/** OpenAI/OpenRouter-shaped text model entry in `GET /v1/models`. */
+export interface LlmModelSummary {
+  id: string;
+  canonical_slug: string;
+  object: 'model';
+  name: string;
+  created: number;
+  owned_by: string;
+  description: string;
+  context_length: number;
+  architecture: {
+    modality: string;
+    input_modalities: string[];
+    output_modalities: string[];
+    tokenizer: string;
+  };
+  /** USD-per-token decimal strings, OpenRouter-compatible. */
+  pricing: { prompt?: string; completion?: string };
+  top_provider: {
+    context_length: number;
+    max_completion_tokens: number;
+    is_moderated: boolean;
+  };
+  supported_parameters: string[];
+  per_request_limits: null;
+}
+
 /** Response of `GET /v1/models`. */
 export interface ModelList {
-  data: ModelSummary[];
+  object?: 'list';
+  data: Array<ModelSummary | LlmModelSummary>;
 }
 
 /** Response of `POST /v1/models/{model}/estimate`. */
@@ -171,6 +204,9 @@ export interface ModelInputField {
 export interface ModelDetail extends ModelSummary {
   input_schema?: Record<string, ModelInputField>;
 }
+
+/** `GET /v1/models/{slug}` returns either generation or text-model details. */
+export type AnyModelDetail = ModelDetail | LlmModelSummary;
 
 /** Response of `GET /v1/account`. */
 export interface Account {

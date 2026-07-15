@@ -374,14 +374,54 @@ describe('models & account', () => {
   it('models.list hits /v1/models', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: [{ slug: 'a', type: 'image', name: 'A' }] }));
     const res = await client.models.list();
-    expect(res.data[0]?.slug).toBe('a');
+    expect(res.data[0]).toMatchObject({ slug: 'a' });
     expect(callArgs().url).toBe(`${BASE_URL}/v1/models`);
+  });
+
+  it('models.list accepts OpenRouter-shaped LLM entries', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        object: 'list',
+        data: [
+          {
+            id: 'gpt-5.6-sol',
+            canonical_slug: 'openai/gpt-5.6-sol',
+            object: 'model',
+            name: 'GPT-5.6 Sol',
+            created: 1783555200,
+            owned_by: 'openai',
+            description: 'Flagship model',
+            context_length: 400000,
+            architecture: {
+              modality: 'text+image->text',
+              input_modalities: ['text', 'image'],
+              output_modalities: ['text'],
+              tokenizer: 'GPT',
+            },
+            pricing: { prompt: '0.00000499875', completion: '0.00003' },
+            top_provider: {
+              context_length: 400000,
+              max_completion_tokens: 8192,
+              is_moderated: false,
+            },
+            supported_parameters: ['tools'],
+            per_request_limits: null,
+          },
+        ],
+      }),
+    );
+    const res = await client.models.list();
+    expect(res.object).toBe('list');
+    expect(res.data[0]).toMatchObject({
+      id: 'gpt-5.6-sol',
+      context_length: 400000,
+    });
   });
 
   it('models.get hits /v1/models/{slug}', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { slug: 'nano-banana-2', type: 'image', name: 'NB2' }));
     const res = await client.models.get('nano-banana-2');
-    expect(res.slug).toBe('nano-banana-2');
+    expect(res).toMatchObject({ slug: 'nano-banana-2' });
     expect(callArgs().url).toBe(`${BASE_URL}/v1/models/nano-banana-2`);
   });
 
