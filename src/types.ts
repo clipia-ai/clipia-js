@@ -97,10 +97,22 @@ export interface OutputVideo {
   duration?: number;
 }
 
-/** Output payload of a completed generation. */
+/** A produced audio track (text-to-speech models). */
+export interface OutputAudio {
+  url: string;
+}
+
+/**
+ * Output payload of a completed generation.
+ *
+ * Note: the webhook delivery carries a slimmer shape than `GET /v1/requests/{id}` —
+ * `original_url` is not included there. Fetch the result by `request_id` when the
+ * full-quality original is needed.
+ */
 export interface GenerationOutput {
   images?: OutputImage[];
   video?: OutputVideo;
+  audio?: OutputAudio;
   [key: string]: unknown;
 }
 
