@@ -92,6 +92,8 @@ export interface OutputVideo {
   url: string;
   /** Full-quality original when available. */
   original_url?: string;
+  /** Poster frame from the provider — lets you render a preview without downloading the video. */
+  thumbnail_url?: string;
   width?: number;
   height?: number;
   duration?: number;
