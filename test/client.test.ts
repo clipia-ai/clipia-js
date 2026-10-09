@@ -145,6 +145,110 @@ describe('queue.submit', () => {
   });
 });
 
+describe('queue.submit retries', () => {
+  const queued = () =>
+    jsonResponse(200, { request_id: 'req-s', status: 'IN_QUEUE', status_url: '', response_url: '' });
+
+  it('retries a transient 503 and reuses the SAME auto-generated Idempotency-Key', async () => {
+    const c = createClient({ apiKey: API_KEY, retryDelayMs: 1 });
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(503, { error: { type: 'api_error', code: 'service_unavailable', message: 'x' } }),
+      )
+      .mockResolvedValueOnce(queued());
+
+    const res = await c.queue.submit('m', { input: { prompt: 'x' } });
+    expect(res.request_id).toBe('req-s');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const first = (callArgs(0).init.headers as Record<string, string>)['Idempotency-Key'];
+    const second = (callArgs(1).init.headers as Record<string, string>)['Idempotency-Key'];
+    expect(first).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(second).toBe(first);
+    // Same body on both attempts.
+    expect(callArgs(1).init.body).toBe(callArgs(0).init.body);
+  });
+
+  it('retries a network failure with the explicit key unchanged', async () => {
+    const c = createClient({ apiKey: API_KEY, retryDelayMs: 1 });
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(queued());
+
+    await c.queue.submit('m', { input: { prompt: 'x' }, idempotencyKey: 'order-42' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const n of [0, 1]) {
+      expect((callArgs(n).init.headers as Record<string, string>)['Idempotency-Key']).toBe('order-42');
+    }
+  });
+
+  it('honors Retry-After on a 429 before retrying', async () => {
+    const c = createClient({ apiKey: API_KEY, retryDelayMs: 10_000 });
+    const throttled = new Response(
+      JSON.stringify({ error: { type: 'rate_limit_error', code: 'concurrency_limit_exceeded', message: 'busy' } }),
+      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '0' } },
+    );
+    fetchMock.mockResolvedValueOnce(throttled).mockResolvedValueOnce(queued());
+
+    const started = Date.now();
+    const res = await c.queue.submit('m', { input: { prompt: 'x' } });
+    expect(res.request_id).toBe('req-s');
+    // Retry-After: 0 wins over the 10 s backoff base.
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after maxRetries transient failures (default 2 → 3 attempts)', async () => {
+    const c = createClient({ apiKey: API_KEY, retryDelayMs: 1 });
+    fetchMock.mockImplementation(async () =>
+      jsonResponse(502, { error: { type: 'api_error', code: 'service_unavailable', message: 'x' } }),
+    );
+    const err = await c.queue.submit('m', { input: { prompt: 'x' } }).catch((e) => e);
+    expect(err).toBeInstanceOf(ClipiaApiError);
+    expect(err.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry a non-transient error (402) and maxRetries: 0 disables retries', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(402, { error: { type: 'billing_error', code: 'insufficient_credits', message: 'x' } }),
+    );
+    await expect(client.queue.submit('m', { input: { prompt: 'x' } })).rejects.toMatchObject({
+      code: 'insufficient_credits',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockReset();
+    const noRetry = createClient({ apiKey: API_KEY, maxRetries: 0 });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(503, { error: { type: 'api_error', code: 'service_unavailable', message: 'x' } }),
+    );
+    await expect(noRetry.queue.submit('m', { input: { prompt: 'x' } })).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribe survives a transient submit failure and keeps one key', async () => {
+    const c = createClient({ apiKey: API_KEY, retryDelayMs: 1 });
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('socket hang up'))
+      .mockResolvedValueOnce(queued())
+      .mockResolvedValueOnce(jsonResponse(200, { request_id: 'req-s', status: 'COMPLETED' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { request_id: 'req-s', status: 'COMPLETED', output: { audio: { url: 'https://media.clipia.ai/a.mp3' } } }),
+      );
+    const out = await c.subscribe('tts', { input: { prompt: 'hello' }, pollIntervalMs: 1 });
+    expect(out.output?.audio?.url).toBe('https://media.clipia.ai/a.mp3');
+    const k0 = (callArgs(0).init.headers as Record<string, string>)['Idempotency-Key'];
+    const k1 = (callArgs(1).init.headers as Record<string, string>)['Idempotency-Key'];
+    expect(k1).toBe(k0);
+  });
+
+  it('rejects invalid retry configuration', () => {
+    expect(() => createClient({ apiKey: API_KEY, maxRetries: -1 })).toThrow(TypeError);
+    expect(() => createClient({ apiKey: API_KEY, maxRetries: 1.5 })).toThrow(TypeError);
+    expect(() => createClient({ apiKey: API_KEY, retryDelayMs: -5 })).toThrow(TypeError);
+  });
+});
+
 describe('queue.status', () => {
   it('maps the status response', async () => {
     fetchMock.mockResolvedValueOnce(
@@ -378,7 +482,7 @@ describe('models & account', () => {
     expect(callArgs().url).toBe(`${BASE_URL}/v1/models`);
   });
 
-  it('models.list accepts OpenRouter-shaped LLM entries', async () => {
+  it('models.list accepts OpenAI-compatible LLM entries', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, {
         object: 'list',

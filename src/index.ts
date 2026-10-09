@@ -1,8 +1,8 @@
 /**
  * clipia — official TypeScript client for the Clipia public API.
  *
- * Zero runtime dependencies; built on the global `fetch`. Mirrors the fal.ai
- * queue DX (`submit → status → result` + `subscribe`) but with Clipia-native
+ * Zero runtime dependencies; built on the global `fetch`. Queue-based flow
+ * (`submit → status → result` + a high-level `subscribe`) with Clipia-native
  * names and credit-based billing.
  *
  * @example
@@ -45,7 +45,7 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 600_000;
 
 /** SDK version — keep in sync with package.json. */
-export const VERSION = '1.1.0';
+export const VERSION = '1.3.0';
 const USER_AGENT = `clipia-sdk-js/${VERSION}`;
 
 /** Configuration for {@link createClient}. */
@@ -56,6 +56,20 @@ export interface ClientConfig {
   baseUrl?: string;
   /** Inject a custom fetch implementation (defaults to the global `fetch`). */
   fetch?: typeof fetch;
+  /**
+   * How many times `queue.submit` (and therefore `subscribe`) retries a
+   * transient failure — network error, `429`, `500`, `502`, `503`, `504` —
+   * before surfacing it. Every attempt of one call reuses the same
+   * `Idempotency-Key`, so a retry can never enqueue or charge twice.
+   * Default `2`; set `0` to disable.
+   */
+  maxRetries?: number;
+  /**
+   * Base delay in milliseconds for the capped exponential backoff between
+   * submit retries (`delay = min(retryDelayMs * 2 ** attempt, 30 000)`), used
+   * only when the server did not send `Retry-After`. Default `500`.
+   */
+  retryDelayMs?: number;
 }
 
 /**
@@ -94,6 +108,12 @@ export class ClipiaApiError extends Error {
 const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
 /** Max consecutive transient failures tolerated per poll before giving up. */
 const MAX_POLL_RETRIES = 4;
+/** Default number of transient retries for `queue.submit` (same Idempotency-Key). */
+const DEFAULT_SUBMIT_RETRIES = 2;
+/** Base delay of the submit retry backoff when no `Retry-After` was sent. */
+const DEFAULT_RETRY_DELAY_MS = 500;
+/** Upper bound of any retry backoff. */
+const MAX_BACKOFF_MS = 30_000;
 
 /** Parse an HTTP `Retry-After` header (delta-seconds or HTTP-date) to ms. */
 function parseRetryAfter(value: string | null): number | undefined {
@@ -110,7 +130,10 @@ function parseRetryAfter(value: string | null): number | undefined {
   return undefined;
 }
 
-/** Whether an error raised during polling is a transient, retryable one. */
+/**
+ * Whether an error is transient and worth retrying (network failure, throttling
+ * or a 5xx). Used both while polling and for `submit` retries.
+ */
 function isRetryablePollError(err: unknown): err is ClipiaApiError {
   return (
     err instanceof ClipiaApiError &&
@@ -217,6 +240,14 @@ export function createClient(config: ClientConfig): ClipiaClient {
         'http://localhost and http://127.0.0.1 are allowed for local development.',
     );
   }
+  const maxRetries = config.maxRetries ?? DEFAULT_SUBMIT_RETRIES;
+  if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+    throw new TypeError('createClient: `maxRetries` must be a non-negative integer.');
+  }
+  const retryDelayMs = config.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
+    throw new TypeError('createClient: `retryDelayMs` must be a non-negative number.');
+  }
   const fetchImpl = config.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') {
     throw new TypeError(
@@ -300,20 +331,31 @@ export function createClient(config: ClientConfig): ClipiaClient {
       if (!options || typeof options.input !== 'object' || options.input === null) {
         throw new TypeError('queue.submit: `input` object is required.');
       }
+      // One key per *call*: every retry below (and any retry the caller does
+      // with the same explicit key) resolves to the same request_id on the
+      // server, so a blip can never enqueue or charge twice.
       const idempotencyKey = options.idempotencyKey ?? generateUuid();
       const body: Record<string, unknown> = { input: options.input };
       if (options.webhookUrl) body.webhook_url = options.webhookUrl;
 
-      const { data } = await request<SubmitResponse>(
-        `/v1/models/${encodeURIComponent(model)}`,
-        {
-          method: 'POST',
-          body,
-          headers: { 'Idempotency-Key': idempotencyKey },
-          signal: options.signal,
-        },
-      );
-      return data;
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          const { data } = await request<SubmitResponse>(
+            `/v1/models/${encodeURIComponent(model)}`,
+            {
+              method: 'POST',
+              body,
+              headers: { 'Idempotency-Key': idempotencyKey },
+              signal: options.signal,
+            },
+          );
+          return data;
+        } catch (err) {
+          if (!isRetryablePollError(err) || attempt >= maxRetries) throw err;
+          const backoff = Math.min(retryDelayMs * 2 ** attempt, MAX_BACKOFF_MS);
+          await sleep(err.retryAfterMs ?? backoff, options.signal);
+        }
+      }
     },
 
     async status(requestId, signal) {
@@ -392,7 +434,7 @@ export function createClient(config: ClientConfig): ClipiaClient {
         // told us exactly how long to wait via Retry-After.
         const backoff = Math.min(
           pollIntervalMs * 2 ** transientFailures,
-          30_000,
+          MAX_BACKOFF_MS,
         );
         const waitMs = err.retryAfterMs ?? backoff;
         await sleep(waitMs, signal);

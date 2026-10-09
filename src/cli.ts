@@ -85,18 +85,24 @@ program
   .argument('<model>', 'model slug, e.g. nano-banana-2')
   .requiredOption('--input <json>', 'generation input as a JSON object')
   .option('--webhook <url>', 'webhook URL for completion notification')
+  .option(
+    '--idempotency-key <key>',
+    'reuse one Idempotency-Key across your own re-runs so the same order is never enqueued twice',
+  )
   .option('--wait', 'poll until the generation reaches a terminal status')
   .action(async (model: string, cmdOpts: OptionValues, command: Command) => {
     const globalOpts = command.optsWithGlobals() as GlobalOpts;
     const client = resolveClient(globalOpts);
     const input = parseInput(cmdOpts['input'] as string);
     const webhookUrl = cmdOpts['webhook'] as string | undefined;
+    const idempotencyKey = cmdOpts['idempotencyKey'] as string | undefined;
 
     try {
       if (cmdOpts['wait']) {
         const result = await client.subscribe(model, {
           input,
           webhookUrl,
+          idempotencyKey,
           onQueueUpdate: (s) => {
             process.stderr.write(
               `status: ${s.status}${
@@ -110,6 +116,7 @@ program
         const submitted = await client.queue.submit(model, {
           input,
           webhookUrl,
+          idempotencyKey,
         });
         printJson(submitted);
       }
