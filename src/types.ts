@@ -58,6 +58,23 @@ export interface SubmitOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * An `input` key the model will not apply. The request is still accepted and
+ * handled exactly as before; the warning only reports the key.
+ */
+export interface InputWarning {
+  /**
+   * Machine-readable reason: `unknown_parameter` (the key is not known to the
+   * API at all, e.g. a typo) or `unsupported_parameter` (the key exists, but
+   * this model neither declares nor uses it). New reasons may be added.
+   */
+  code: "unknown_parameter" | "unsupported_parameter" | (string & {});
+  /** The `input` key that was ignored. */
+  parameter: string;
+  /** English explanation listing the parameters the model declares. */
+  message: string;
+}
+
 /** Response of `POST /v1/models/{model}` (enqueue). */
 export interface SubmitResponse {
   request_id: string;
@@ -67,6 +84,11 @@ export interface SubmitResponse {
   response_url: string;
   /** Fixed credit cost reserved for this operation. */
   cost?: number;
+  /**
+   * `input` keys the model will not apply. Present only when there are any;
+   * check it after `submit` to catch typos and parameters of another model.
+   */
+  warnings?: InputWarning[];
 }
 
 /** Response of `GET /v1/requests/{id}/status`. */
@@ -233,6 +255,8 @@ export interface ModelList {
 export interface EstimateResponse {
   /** Deterministic credit cost for the given `input` on this model. */
   credits: number;
+  /** `input` keys the model will not apply. Present only when there are any. */
+  warnings?: InputWarning[];
 }
 
 /** A single field in a model input schema. */

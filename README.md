@@ -108,6 +108,20 @@ const account = await clipia.account.get();
 console.log(account.balance.credits);
 ```
 
+### Ignored parameters (`warnings`)
+
+`queue.submit()` and `models.estimate()` still accept an `input` key the model
+will not apply (a typo, a parameter of another model), but the response then
+carries `warnings` — one entry per ignored key, naming it and listing the
+parameters the model declares. The field is absent when everything was accepted.
+
+```ts
+for (const warning of job.warnings ?? []) {
+  console.warn(warning.code, warning.parameter, warning.message);
+  // unknown_parameter aspect_ration Parameter "aspect_ration" is not recognized and was ignored. …
+}
+```
+
 The unified catalog also returns OpenAI-compatible text models such as
 `gpt-5.6-sol`; their entries use `id`, `context_length` and per-token
 `pricing`. Use the standard OpenAI SDK with

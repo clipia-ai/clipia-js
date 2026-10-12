@@ -1,5 +1,12 @@
 # Changelog — clipia-ai (TypeScript)
 
+## Unreleased
+
+- Types: `InputWarning` and `warnings?: InputWarning[]` on `SubmitResponse` and
+  `EstimateResponse` — `input` keys the model will not apply (a typo, a
+  parameter of another model). The request is still accepted and handled exactly
+  as before; the field is absent when nothing was ignored.
+
 ## 1.4.0 — 2026-10-12
 
 - Types: `GenerationOutput.audios` (every audio track — music models return
