@@ -1,6 +1,6 @@
 {
   "name": "clipia-ai",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Official TypeScript client and CLI for the Clipia public API (text model catalog plus image & video generation queue).",
   "license": "MIT",
   "author": "Clipia <support@clipia.ai> (https://clipia.ai)",

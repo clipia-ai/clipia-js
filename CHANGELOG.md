@@ -1,6 +1,6 @@
 # Changelog — clipia-ai (TypeScript)
 
-## Unreleased
+## 1.4.0 — 2026-10-12
 
 - Types: `GenerationOutput.audios` (every audio track — music models return
   several variants; the first equals `audio`), `ModelPricing.estimate_required`
@@ -22,5 +22,3 @@
 - README: speech and music example, idempotency and retries section, error
   table, audio catalog fields, MCP tool list with `generate_audio` /
   `generate_music`.
-
-Not published yet.
