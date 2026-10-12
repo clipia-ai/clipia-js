@@ -140,7 +140,7 @@ console.log(result.output?.video?.url);
 const speech = await clipia.subscribe("gemini-3-1-flash-tts", {
   input: { prompt: "Welcome to Clipia.", voice: "Zephyr" },
 });
-console.log(speech.output?.audio?.url); // MP3 on media.clipia.ai
+console.log(speech.output?.audio?.url); // audio file on media.clipia.ai; container is in audio.format
 
 // Music from a description.
 const track = await clipia.subscribe("suno-music", {

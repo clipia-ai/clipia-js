@@ -1,5 +1,12 @@
 # Changelog — clipia-ai (TypeScript)
 
+## Unreleased
+
+- Types: `GenerationOutput.audios` (every audio track — music models return
+  several variants; the first equals `audio`), `ModelPricing.estimate_required`
+  (the price depends on the input: call `estimate`), `ResultResponse.cost`
+  documented as the charged amount (0 for `FAILED` / `CANCELED`).
+
 ## 1.3.0 — 2026-10-09
 
 - `queue.submit` / `subscribe` retry transient failures (network error, 429,

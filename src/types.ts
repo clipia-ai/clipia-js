@@ -119,7 +119,13 @@ export interface OutputAudio {
 export interface GenerationOutput {
   images?: OutputImage[];
   video?: OutputVideo;
+  /** First audio track (the only one for text-to-speech). */
   audio?: OutputAudio;
+  /**
+   * Every produced audio track. Music models return several variants per
+   * request; the first element equals `audio`.
+   */
+  audios?: OutputAudio[];
   [key: string]: unknown;
 }
 
@@ -142,6 +148,11 @@ export interface ResultResponse {
   model?: string;
   output?: GenerationOutput;
   error?: ResultError;
+  /**
+   * Credits: the reserve while the request is running, the amount actually
+   * charged once it is finished (0 for `FAILED` / `CANCELED` — the reserve is
+   * returned).
+   */
   cost?: number;
   created_at?: string;
   completed_at?: string;
@@ -159,6 +170,12 @@ export interface ModelPricing {
   rounding?: "ceil";
   minimum_credits?: number;
   available?: false;
+  /**
+   * `true` when the model works but its price depends on the submitted input
+   * (e.g. the length of the source media): `credits` is absent — call
+   * `estimate` with the actual input.
+   */
+  estimate_required?: true;
   credits_base?: number;
   multipliers?: Record<string, Record<string, number>>;
   note?: string;
