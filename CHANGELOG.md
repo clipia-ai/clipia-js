@@ -1,6 +1,6 @@
 # Changelog — clipia-ai (TypeScript)
 
-## Unreleased
+## 1.5.0 — 2026-10-13
 
 - Types: `InputWarning` and `warnings?: InputWarning[]` on `SubmitResponse` and
   `EstimateResponse` — `input` keys the model will not apply (a typo, a

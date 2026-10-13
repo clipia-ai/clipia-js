@@ -45,7 +45,7 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 600_000;
 
 /** SDK version — keep in sync with package.json. */
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 const USER_AGENT = `clipia-sdk-js/${VERSION}`;
 
 /** Configuration for {@link createClient}. */
