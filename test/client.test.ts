@@ -297,6 +297,34 @@ describe('queue.result', () => {
     expect(result.pending).toBe(true);
     expect(result.status).toBe('IN_PROGRESS');
   });
+
+  it('exposes audio_dropped in warnings of the result and of the status', async () => {
+    const warning = {
+      code: 'audio_dropped',
+      parameter: 'generate_audio',
+      message: 'The video is generated without sound.',
+    };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        request_id: 'req-1',
+        status: 'COMPLETED',
+        model: 'seedance-2-fast-t2v',
+        output: { video: { url: 'https://media.clipia.ai/a.mp4' } },
+        cost: 40,
+        warnings: [warning],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { request_id: 'req-1', status: 'IN_PROGRESS', warnings: [warning] }),
+    );
+
+    const result = await client.queue.result('req-1');
+    expect(result.warnings).toEqual([warning]);
+    expect(result.warnings?.[0]?.code).toBe('audio_dropped');
+
+    const status = await client.queue.status('req-1');
+    expect(status.warnings).toEqual([warning]);
+  });
 });
 
 describe('models.estimate', () => {

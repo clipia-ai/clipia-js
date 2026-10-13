@@ -61,17 +61,27 @@ export interface SubmitOptions {
 /**
  * An `input` key the model will not apply. The request is still accepted and
  * handled exactly as before; the warning only reports the key.
+ *
+ * The same shape reports a parameter dropped while the request was running
+ * (`audio_dropped`) — see `warnings` on `StatusResponse` and `ResultResponse`.
  */
 export interface InputWarning {
   /**
    * Machine-readable reason: `unknown_parameter` (the key is not known to the
-   * API at all, e.g. a typo) or `unsupported_parameter` (the key exists, but
-   * this model neither declares nor uses it). New reasons may be added.
+   * API at all, e.g. a typo), `unsupported_parameter` (the key exists, but
+   * this model neither declares nor uses it) or `audio_dropped` (sound was
+   * requested, but the audio track did not pass the model's safety check: the
+   * video is generated without sound, the price of the request is unchanged —
+   * reported only on status and result responses). New reasons may be added.
    */
-  code: "unknown_parameter" | "unsupported_parameter" | (string & {});
-  /** The `input` key that was ignored. */
+  code:
+    | "unknown_parameter"
+    | "unsupported_parameter"
+    | "audio_dropped"
+    | (string & {});
+  /** The `input` key that was ignored (`generate_audio` for `audio_dropped`). */
   parameter: string;
-  /** English explanation listing the parameters the model declares. */
+  /** English explanation; for ignored keys it lists the parameters the model declares. */
   message: string;
 }
 
@@ -99,6 +109,11 @@ export interface StatusResponse {
   /** Progress 0–100 while `IN_PROGRESS`. */
   progress?: number;
   logs?: unknown[];
+  /**
+   * Parameters dropped while the request was running (currently only
+   * `audio_dropped`). Present only when there are any.
+   */
+  warnings?: InputWarning[];
 }
 
 /** A single produced image. */
@@ -180,6 +195,13 @@ export interface ResultResponse {
   completed_at?: string;
   /** `true` when the API responded 202 (still IN_QUEUE / IN_PROGRESS). */
   pending?: boolean;
+  /**
+   * Parameters dropped while the request was running. Currently only
+   * `audio_dropped`: the video was generated without sound although sound was
+   * requested. Present only when there are any; never set for `FAILED` /
+   * `CANCELED`.
+   */
+  warnings?: InputWarning[];
 }
 
 /** Pricing summary in the model catalog. */

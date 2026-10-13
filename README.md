@@ -122,6 +122,18 @@ for (const warning of job.warnings ?? []) {
 }
 ```
 
+`queue.status()`, `queue.result()` and `subscribe()` use the same field for a
+parameter dropped while the request was running. The only reason so far is
+`audio_dropped`: sound was requested, but the audio track did not pass the
+model's safety check, so the video is generated without sound (the price of the
+request is unchanged).
+
+```ts
+if (result.warnings?.some((w) => w.code === "audio_dropped")) {
+  console.warn("The video has no sound.");
+}
+```
+
 The unified catalog also returns OpenAI-compatible text models such as
 `gpt-5.6-sol`; their entries use `id`, `context_length` and per-token
 `pricing`. Use the standard OpenAI SDK with
